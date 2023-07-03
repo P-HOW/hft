@@ -39,3 +39,4 @@ def summarize_24h_volume(my_trades):
     volume = sum(float(trade['quoteQty']) for trade in my_trades if trade['time'] > twenty_four_hours_ago)
 
     return volume
+
