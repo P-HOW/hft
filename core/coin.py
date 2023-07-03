@@ -1,12 +1,25 @@
 # We first import the Client from the python-binance package
 from binance.client import Client
 from binance.exceptions import BinanceAPIException
+from binance.enums import SIDE_BUY, ORDER_TYPE_LIMIT, TIME_IN_FORCE_GTC, SIDE_SELL
+import math
+
+
+def get_balance(client, asset):
+    try:
+        balance_info = client.get_asset_balance(asset=asset)
+        if balance_info is not None:
+            return balance_info['free'], balance_info['locked']
+    except BinanceAPIException as e:
+        print(f"An error occurred while fetching the balance: {e}")
+    return None, None
 
 
 class Coin:
     def __init__(self, symbol: str, client: Client):
         self.symbol = symbol
         self.client = client
+        self.pairs = {}  # This dictionary will store the symbol pair info
 
     def get_my_trades(self, pair: str):
         # Create the symbol pair string
@@ -27,8 +40,8 @@ class Coin:
             trades = self.get_my_trades(pair)
         return trades
 
-    def get_symbol_info(self, pair:str):
-        symbol_pair = f"{self.symbol}{self.pair}"
+    def get_symbol_info(self, pair: str):
+        symbol_pair = f"{self.symbol}{pair}"
 
         try:
             # Attempt to get information for this symbol pair
@@ -60,3 +73,130 @@ class Coin:
         while tickers is None:
             tickers = self.get_all_tickers()
         return tickers
+
+    def add_pair(self, pair):
+        try:
+            # Attempt to get information for this symbol pair
+            symbol_info = self.guarantee_get_symbol_info(pair)
+            self.pairs[pair] = symbol_info  # Store the symbol pair info in the pairs dictionary
+
+        except BinanceAPIException as e:
+            print(f"An error occurred while fetching symbol info: {e}")
+
+    def place_buy_limit_order(self, pair, quantity, price):
+        symbol_info = self.pairs.get(pair)
+
+        # If symbol info is not available, return early
+        if symbol_info is None:
+            print(f"Couldn't fetch the symbol info for {self.symbol}/{pair}")
+            return
+
+        # Get the filters for the symbol
+        filters = symbol_info['filters']
+
+        # Find the price filter and lot size filter
+        price_filter = next((f for f in filters if f['filterType'] == 'PRICE_FILTER'), None)
+        lot_size_filter = next((f for f in filters if f['filterType'] == 'LOT_SIZE'), None)
+
+        # Get the tick size and step size from the filters
+        tick_size = float(price_filter['tickSize'])
+        step_size = float(lot_size_filter['stepSize'])
+
+        # Calculate the number of decimal places for the tick size and step size
+        tick_size_decimals = int(round(-math.log(tick_size, 10)))
+        step_size_decimals = int(round(-math.log(step_size, 10)))
+
+        # Format the price and quantity
+        formatted_price = "{:0.0{}f}".format(price, tick_size_decimals)
+        formatted_quantity = "{:0.0{}f}".format(quantity, step_size_decimals)
+
+        try:
+            order = self.client.create_order(
+                symbol=f"{self.symbol}{pair}",
+                side=SIDE_BUY,
+                type=ORDER_TYPE_LIMIT,
+                timeInForce=TIME_IN_FORCE_GTC,
+                quantity=formatted_quantity,
+                price=formatted_price
+            )
+            return order
+        except BinanceAPIException as e:
+            print(f"An error occurred while placing the order: {e}")
+            return None
+
+
+    def place_sell_limit_order(self, pair, quantity, price):
+        symbol_info = self.pairs.get(pair)
+
+        # Get the filters for the symbol
+        filters = symbol_info['filters']
+
+        # Find the price filter and lot size filter
+        price_filter = next((f for f in filters if f['filterType'] == 'PRICE_FILTER'), None)
+        lot_size_filter = next((f for f in filters if f['filterType'] == 'LOT_SIZE'), None)
+
+        # Get the tick size and step size from the filters
+        tick_size = float(price_filter['tickSize'])
+        step_size = float(lot_size_filter['stepSize'])
+
+        # Calculate the number of decimal places for the tick size and step size
+        tick_size_decimals = int(round(-math.log(tick_size, 10)))
+        step_size_decimals = int(round(-math.log(step_size, 10)))
+
+        # Format the price and quantity
+        formatted_price = "{:0.0{}f}".format(price, tick_size_decimals)
+        formatted_quantity = "{:0.0{}f}".format(quantity, step_size_decimals)
+
+        try:
+            order = self.client.create_order(
+                symbol=f"{self.symbol}{pair}",
+                side=SIDE_SELL,
+                type=ORDER_TYPE_LIMIT,
+                timeInForce=TIME_IN_FORCE_GTC,
+                quantity=formatted_quantity,
+                price=formatted_price
+            )
+            return order
+        except BinanceAPIException as e:
+            print(f"An error occurred while placing the order: {e}")
+            return None
+
+    def guaranteed_get_balance(self, asset):
+        free_balance, locked_balance = get_balance(self.client, asset)
+        while free_balance is None or locked_balance is None:
+            free_balance, locked_balance = get_balance(self.client, asset)
+        return free_balance, locked_balance
+
+    def get_open_orders(self, pair):
+        try:
+            open_orders = self.client.get_open_orders(symbol=f"{self.symbol}{pair}")
+            return open_orders
+        except BinanceAPIException as e:
+            print(f"An error occurred while fetching the open orders: {e}")
+            return None
+
+    def guaranteed_get_open_orders(self, pair):
+        open_orders = self.get_open_orders(pair)
+        while open_orders is None:
+            open_orders = self.get_open_orders(pair)
+        return open_orders
+
+    def guaranteed_cancel_orders_above_threshold(self, pair, threshold):
+        while True:
+            open_orders = self.guaranteed_get_open_orders(pair)
+            # filter the orders whose price is higher than the threshold
+            high_price_orders = [order for order in open_orders if float(order['price']) > threshold]
+
+            if len(high_price_orders) == 0:
+                break  # break the loop if no high price orders are left
+
+            for order in high_price_orders:
+                try:
+                    result = self.client.cancel_order(
+                        symbol=f"{self.symbol}{pair}",
+                        orderId=order['orderId']
+                    )
+                except BinanceAPIException as e:
+                    print(f"An error occurred while cancelling the order {order['orderId']}: {e}")
+
+
