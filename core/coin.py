@@ -45,3 +45,18 @@ class Coin:
             info = self.get_symbol_info(pair)
         return info
 
+    def get_all_tickers(self):
+        try:
+            # Attempt to get all tickers
+            tickers = self.client.get_all_tickers()
+            return tickers
+
+        except BinanceAPIException as e:
+            print(f"An error occurred while fetching tickers: {e}")
+            return None
+
+    def guarantee_get_all_tickers(self):
+        tickers = self.get_all_tickers()
+        while tickers is None:
+            tickers = self.get_all_tickers()
+        return tickers
