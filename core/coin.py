@@ -165,7 +165,7 @@ class Coin:
         free_balance, locked_balance = get_balance(self.client, asset)
         while free_balance is None or locked_balance is None:
             free_balance, locked_balance = get_balance(self.client, asset)
-        return free_balance, locked_balance
+        return float(free_balance), float(locked_balance)
 
     def get_open_orders(self, pair):
         try:
