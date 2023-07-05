@@ -1,5 +1,6 @@
 import time
 
+
 def match_trade_data(usdt_trades, tusd_trades):
     # Convert the lists into dictionaries with time as the key
     usdt_dict = {trade['time']: trade['price'] for trade in usdt_trades}
@@ -9,12 +10,14 @@ def match_trade_data(usdt_trades, tusd_trades):
     common_times = set(usdt_dict.keys()) & set(tusd_dict.keys())
 
     # Create a new list of trade data with prices from both pairs at the same time
-    matched_trades = [{'time': time, 'usdt_price': usdt_dict[time], 'tusd_price': tusd_dict[time]} for time in common_times]
+    matched_trades = [{'time': time, 'usdt_price': usdt_dict[time], 'tusd_price': tusd_dict[time]} for time in
+                      common_times]
 
     # Sort the list by time
     matched_trades.sort(key=lambda trade: trade['time'])
 
     return matched_trades
+
 
 def find_pair_price_from_tickers(prices, pair):
     pair_price = None
@@ -29,6 +32,7 @@ def find_pair_price_from_tickers(prices, pair):
     # Check if we found the price
     return pair_price
 
+
 def summarize_24h_volume(my_trades):
     current_time = int(time.time() * 1000)
 
@@ -40,3 +44,6 @@ def summarize_24h_volume(my_trades):
 
     return volume
 
+
+def check_price(p, last_buy, price_drop, price_increase):
+    return (p - last_buy < price_drop) or (p - last_buy > price_increase)
