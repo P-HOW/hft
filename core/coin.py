@@ -325,8 +325,25 @@ class Coin:
 
     def sell_at_market_price(self, pair, quantity):
         symbol = f"{self.symbol}{pair}"
+        symbol_info = self.pairs.get(pair)
+
+        # Get the filters for the symbol
+        filters = symbol_info['filters']
+
+        # Find the lot size filter
+        lot_size_filter = next((f for f in filters if f['filterType'] == 'LOT_SIZE'), None)
+
+        # Get the step size from the filter
+        step_size = float(lot_size_filter['stepSize'])
+
+        # Calculate the number of decimal places for the step size
+        step_size_decimals = int(round(-math.log(step_size, 10)))
+
+        # Format the quantity
+        formatted_quantity = "{:0.0{}f}".format(quantity, step_size_decimals)
+
         try:
-            order = self.client.order_market_sell(symbol=symbol, quantity=quantity)
+            order = self.client.order_market_sell(symbol=symbol, quantity=formatted_quantity)
             return order
         except BinanceAPIException as e:
             print(f"An error occurred while placing the order: {e}")
