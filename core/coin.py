@@ -3,7 +3,8 @@ from binance.client import Client
 from binance.exceptions import BinanceAPIException
 from binance.enums import SIDE_BUY, ORDER_TYPE_LIMIT, TIME_IN_FORCE_GTC, SIDE_SELL
 import math
-
+import time
+import hft
 
 def get_balance(client, asset):
     try:
@@ -12,6 +13,8 @@ def get_balance(client, asset):
             return balance_info['free'], balance_info['locked']
     except BinanceAPIException as e:
         print(f"An error occurred while fetching the balance: {e}")
+    except Exception as e:
+        print(f"An unexpected error occurred: {e}")
     return None, None
 
 
@@ -32,7 +35,11 @@ class Coin:
 
         except BinanceAPIException as e:
             print(f"An error occurred: {e}")
-            return None
+
+        except Exception as e:
+            print(f"An unexpected error occurred: {e}")
+
+        return None
 
     def guarantee_get_my_trades(self, pair: str):
         trades = self.get_my_trades(pair)
@@ -51,6 +58,9 @@ class Coin:
         except BinanceAPIException as e:
             print(f"An error occurred while fetching symbol info: {e}")
             return None
+        except Exception as e:
+            print(f"An unexpected error occurred: {e}")
+        return None
 
     def guarantee_get_symbol_info(self, pair: str):
         info = self.get_symbol_info(pair)
@@ -66,7 +76,10 @@ class Coin:
 
         except BinanceAPIException as e:
             print(f"An error occurred while fetching tickers: {e}")
-            return None
+
+        except Exception as e:
+            print(f"An unexpected error occurred: {e}")
+        return None
 
     def guarantee_get_all_tickers(self):
         tickers = self.get_all_tickers()
@@ -123,7 +136,9 @@ class Coin:
         except BinanceAPIException as e:
             print(f"An error occurred while placing the order: {e}")
             return None
-
+        except Exception as e:
+            print(f"An unexpected error occurred: {e}")
+            return None
 
     def place_sell_limit_order(self, pair, quantity, price):
         symbol_info = self.pairs.get(pair)
@@ -173,7 +188,10 @@ class Coin:
             return open_orders
         except BinanceAPIException as e:
             print(f"An error occurred while fetching the open orders: {e}")
-            return None
+
+        except Exception as e:
+            print(f"An unexpected error occurred: {e}")
+        return None
 
     def guaranteed_get_open_orders(self, pair):
         open_orders = self.get_open_orders(pair)
@@ -196,7 +214,44 @@ class Coin:
                         symbol=f"{self.symbol}{pair}",
                         orderId=order['orderId']
                     )
+                    return result
                 except BinanceAPIException as e:
                     print(f"An error occurred while cancelling the order {order['orderId']}: {e}")
+                except Exception as e:
+                    print(f"An unexpected error occurred: {e}")
+                return None
+
+    def blocked_for_sell_all(self, pair, price, order_bias, qty_min, d_bar_array, k1, k2, d_bar_array_length, TIME_OUT):
+        start_time = time.time()  # Get the current time
+        ul, _ = self.guaranteed_get_balance(self.symbol)
+        while self.place_sell_limit_order(pair, ul * order_bias, price) is None:
+            print("Blocked_for_sell_all function error")
+        _, l = self.guaranteed_get_balance(self.symbol)
+        while l > qty_min:
+            if time.time() - start_time > TIME_OUT:
+                return True
+            hft.get_p_reference(self, d_bar_array, k1, k2, d_bar_array_length)
+            _, l = self.guaranteed_get_balance(self.symbol)
+            # wait for sell orders to be filled....
+        return False
+
+    def get_avg_price(self, pair):
+        try:
+            ticker = self.client.get_ticker(symbol=f"{self.symbol}{pair}")
+            bid_price = float(ticker['bidPrice'])
+            ask_price = float(ticker['askPrice'])
+            avg_price = (bid_price + ask_price) / 2
+            return avg_price
+        except BinanceAPIException as e:
+            print(f"An error occurred while fetching the ticker: {e}")
+        except Exception as e:
+            print(f"An unexpected error occurred: {e}")
+        return None
+
+    def guaranteed_get_avg_price(self, pair):
+        avg_price = self.get_avg_price(pair)
+        while avg_price is None:
+            avg_price = self.get_avg_price(pair)
+        return avg_price
 
 
