@@ -324,9 +324,11 @@ class Coin:
         return avg_price
 
     def sell_at_market_price(self, pair, quantity):
+        print(self.pairs)
+        print(pair)
         symbol = f"{self.symbol}{pair}"
         symbol_info = self.pairs.get(pair)
-
+        print(symbol_info)
         # Get the filters for the symbol
         filters = symbol_info['filters']
 
