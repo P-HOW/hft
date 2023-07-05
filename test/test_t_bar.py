@@ -18,7 +18,8 @@ client = Client(api_key, api_secret)
 # Now you can create an instance of Coin
 coin = Coin("BTC", client)
 d_bar_array = []
-hft.initialize_d_bar_array(coin, d_bar_array, d_bar_array_length)
 while True:
-    p = hft.get_p_reference(coin,d_bar_array)
-    print(f'\rBTCTUSD bar price: {p}, dBarLength : {len(d_bar_array)}', end='', flush=True)
+    ticker = client.get_ticker(symbol="BTCTUSD")
+    bid_price = float(ticker['bidPrice'])
+    ask_price = float(ticker['askPrice'])
+    print(f'\rBidpirce: {bid_price}, Askprice : {ask_price}', end='', flush=True)
