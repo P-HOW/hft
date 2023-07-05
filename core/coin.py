@@ -251,21 +251,44 @@ class Coin:
             # filter the orders whose price is higher than the threshold
             high_price_orders = [order for order in open_orders if float(order['price']) > threshold]
 
+            # break the loop if no high price orders are left
             if len(high_price_orders) == 0:
-                break  # break the loop if no high price orders are left
+                break
 
             for order in high_price_orders:
+                while True:
+                    try:
+                        self.client.cancel_order(
+                            symbol=f"{self.symbol}{pair}",
+                            orderId=order['orderId']
+                        )
+                        # Break the inner loop if the cancellation was successful
+                        break
+                    except BinanceAPIException as e:
+                        print(f"An error occurred while cancelling the order {order['orderId']}: {e}")
+                    except Exception as e:
+                        print(f"An unexpected error occurred: {e}")
+
+        return None
+
+    def guaranteed_cancel_all_open_orders(self, pair):
+        while True:
+            open_orders = self.guaranteed_get_open_orders(pair)
+
+            if len(open_orders) == 0:
+                break  # break the loop if no open orders are left
+
+            for order in open_orders:
                 try:
-                    result = self.client.cancel_order(
+                    self.client.cancel_order(
                         symbol=f"{self.symbol}{pair}",
                         orderId=order['orderId']
                     )
-                    return result
                 except BinanceAPIException as e:
                     print(f"An error occurred while cancelling the order {order['orderId']}: {e}")
                 except Exception as e:
                     print(f"An unexpected error occurred: {e}")
-                return None
+        return None
 
     def blocked_for_sell_all(self, pair, price, order_bias, qty_min, d_bar_array, k1, k2, d_bar_array_length, TIME_OUT):
         start_time = time.time()  # Get the current time
@@ -275,11 +298,11 @@ class Coin:
         _, l = self.guaranteed_get_balance(self.symbol)
         while l > qty_min:
             if time.time() - start_time > TIME_OUT:
-                return True
+                return False
             get_p_reference(self, d_bar_array, k1, k2, d_bar_array_length)
             _, l = self.guaranteed_get_balance(self.symbol)
             # wait for sell orders to be filled....
-        return False
+        return True
 
     def get_avg_price(self, pair):
         try:
@@ -310,3 +333,35 @@ class Coin:
         except Exception as e:
             print(f"An unexpected error occurred: {e}")
         return None
+
+    def get_last_buy_average_price(self, pair: str):
+        trades = self.guarantee_get_my_trades(pair)
+        if trades is None or len(trades) == 0:
+            print(f"No trade history found for pair: {pair}")
+            return None
+
+        # Finding the most recent sell trade
+        sell_trades = [trade for trade in trades if not trade['isBuyer']]
+        sell_trades.sort(key=lambda x: x['time'], reverse=True)
+        if len(sell_trades) == 0:
+            print(f"No sell trade found for pair: {pair}")
+            return None
+        last_sell_timestamp = sell_trades[0]['time']  # The timestamp of the most recent sell order
+
+        # Finding all buy orders occurred after the most recent sell order
+        buy_trades_after_last_sell = [trade for trade in trades if
+                                      trade['isBuyer'] and trade['time'] > last_sell_timestamp]
+        if len(buy_trades_after_last_sell) == 0:
+            print(f"No buy orders found after the last sell order for pair: {pair}")
+            return None
+
+        # Calculating the average price of these buy trades
+        total_cost = 0.0
+        total_qty = 0.0
+        for trade in buy_trades_after_last_sell:
+            total_cost += float(trade['price']) * float(trade['qty'])
+            total_qty += float(trade['qty'])
+
+        average_price = total_cost / total_qty if total_qty else 0.0
+
+        return average_price
