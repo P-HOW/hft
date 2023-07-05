@@ -254,4 +254,13 @@ class Coin:
             avg_price = self.get_avg_price(pair)
         return avg_price
 
-
+    def sell_at_market_price(self, pair, quantity):
+        symbol = f"{self.symbol}{pair}"
+        try:
+            order = self.client.order_market_sell(symbol=symbol, quantity=quantity)
+            return order
+        except BinanceAPIException as e:
+            print(f"An error occurred while placing the order: {e}")
+        except Exception as e:
+            print(f"An unexpected error occurred: {e}")
+        return None
