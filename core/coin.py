@@ -4,7 +4,36 @@ from binance.exceptions import BinanceAPIException
 from binance.enums import SIDE_BUY, ORDER_TYPE_LIMIT, TIME_IN_FORCE_GTC, SIDE_SELL
 import math
 import time
-import hft
+import statistics
+
+
+def find_pair_price_from_tickers(prices, pair):
+    pair_price = None
+
+    # Iterate over the prices data
+    for item in prices:
+        # If the symbol is "BTCUSDT", save the price and break the loop
+        if item['symbol'] == pair:
+            pair_price = item['price']
+            break
+
+    # Check if we found the price
+    return pair_price
+
+
+def get_p_reference(coin, d_bar_array, k1, k2, d_bar_array_length):
+    prices = coin.guarantee_get_all_tickers()
+    p2 = coin.guaranteed_get_avg_price("USDT")
+    p3 = coin.guaranteed_get_avg_price("TUSD")
+    p1 = float(find_pair_price_from_tickers(prices, "TUSDUSDT"))
+    p3_star = float(p2 / p1)
+    d_bar_array.append(p3 - p2)
+    if len(d_bar_array) > d_bar_array_length:
+        d_bar_array.pop(0)
+    d_bar = statistics.mean(d_bar_array)
+    p3_bar = p2 + d_bar
+    return p3_bar * k1 + p3_star * k2, p3
+
 
 def get_balance(client, asset):
     try:
@@ -247,7 +276,7 @@ class Coin:
         while l > qty_min:
             if time.time() - start_time > TIME_OUT:
                 return True
-            hft.get_p_reference(self, d_bar_array, k1, k2, d_bar_array_length)
+            get_p_reference(self, d_bar_array, k1, k2, d_bar_array_length)
             _, l = self.guaranteed_get_balance(self.symbol)
             # wait for sell orders to be filled....
         return False
