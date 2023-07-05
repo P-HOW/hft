@@ -96,6 +96,23 @@ class Coin:
         except BinanceAPIException as e:
             print(f"An error occurred while fetching symbol info: {e}")
 
+    def get_step_size(self, pair):
+        try:
+            # Attempt to get symbol info from the pairs dictionary
+            symbol_info = self.pairs.get(pair)
+
+            # If symbol info was found
+            if symbol_info:
+                # Find the step size
+                for filter_info in symbol_info['filters']:
+                    if filter_info['filterType'] == 'LOT_SIZE':
+                        return float(filter_info['stepSize'])
+
+        except Exception as e:
+            print(f"An unexpected error occurred: {e}")
+
+        return None
+
     def place_buy_limit_order(self, pair, quantity, price):
         symbol_info = self.pairs.get(pair)
 
