@@ -36,6 +36,7 @@ def get_p_reference(coin, d_bar_array, k1, k2, d_bar_array_length):
 
 
 def get_balance(client, asset):
+    time.sleep(0.05)
     try:
         balance_info = client.get_asset_balance(asset=asset)
         if balance_info is not None:
